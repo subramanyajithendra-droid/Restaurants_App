@@ -1,0 +1,8 @@
+search functionality - elastic search
+mongodb data dump
+console.log working......
+
+when loading by search with trie , data other than name, cuisines are not coming and pagination not working correctly..
+
+name different for both trie and elastic search code !!
+

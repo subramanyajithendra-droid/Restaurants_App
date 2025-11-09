@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Zomato Restaurants</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    body {
+  font-family: Arial, sans-serif;
+  background: #fafafa;
+  margin: 0;
+  padding: 20px;
+  color: #333;
+}
+
+/* Header */
+h1 {
+  margin: 0;
+  color: #d32323;
+}
+
+/* Filter Button */
+.filter-btn {
+  background: #d32323;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.filter-btn:hover {
+  background: #b71c1c;
+}
+
+/* Filter Options Panel */
+.filter-options {
+  display: none;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+.filter-group {
+  margin-bottom: 10px;
+}
+.filter-group summary {
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.filter-group label {
+  display: block;
+  font-size: 14px;
+  margin-left: 12px;
+  cursor: pointer;
+}
+
+/* Sort Dropdown */
+select {
+  padding: 6px 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  outline: none;
+}
+
+/* Restaurant Cards */
+.restaurant-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 15px;
+}
+.card {
+  display: flex;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+}
+.card-icon {
+  background: #d32323;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  font-size: 24px;
+}
+.card-content {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.card-content span {
+  font-size: 14px;
+  color: #555;
+}
+.card-content strong {
+  color: #333;
+}
+.rate {
+  font-weight: bold;
+  color: #ff9800;
+}
+
+/* Pagination */
+#paginationControls button {
+  transition: background 0.2s, color 0.2s;
+}
+#paginationControls button:hover {
+  background: #d32323 !important;
+  color: white !important;
+}
+
+/* Autocomplete Dropdown */
+.autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.autocomplete-item:hover {
+  background: #f5f5f5;
+}
+
+.autocomplete-item .icon {
+  font-size: 20px;
+}
+
+.autocomplete-item.cuisine .icon {
+  color: #e67e22; /* orange-ish for food */
+}
+
+.autocomplete-item.restaurant .icon {
+  color: #3498db; /* blue for restaurant */
+}
+
+.autocomplete-item .name {
+  font-weight: 500;
+}
+
+
+  </style>
+</head>
+<body>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h1>🍽️ Restaurants in Your City</h1>
+    <div id="resultCount" style="font-weight: bold; font-size: 16px; color: #333;"></div>
+  </div>
+
+  <div style="margin-bottom: 16px;">
+    <button class="filter-btn" onclick="toggleFilters()">Filter By ⬇️</button>
+    <div id="filterOptions" class="filter-options"></div>
+  </div>
+
+  <div style="margin-bottom: 16px;">
+    <label for="sortSelect"><strong>Sort By:</strong></label>
+    <select id="sortSelect" onchange="applyFiltersAndPaginate(1)">
+      <option value="">-- Select --</option>
+      <option value="votes_asc">Votes (Low → High)</option>
+      <option value="votes_desc">Votes (High → Low)</option>
+      <option value="rate_asc">Rate (Low → High)</option>
+      <option value="rate_desc">Rate (High → Low)</option>
+    </select>
+  </div> 
+
+
+  <!-- 🔍 Search Bar with Autocomplete -->
+<div style="position: relative; margin-bottom: 16px; display: flex; gap: 10px; align-items: center;">
+  <div style="position: relative; flex: 1;">
+
+    <!-- <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="🔍 Search restaurants by ELastic Search..." 
+      style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 5px;"
+      onkeyup="if(event.key === 'Enter') applySearch(1)" 
+    /> -->
+
+    <input 
+      type="text" 
+      id="searchInput" 
+      placeholder="🔍 Search for restaurants or cuisines..." 
+      style="width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px;"
+      oninput="debounceSearch()" 
+      onfocus="showAutocompleteSuggestions()"
+    />
+    <div id="autocompleteResults" class="autocomplete-list"></div>
+  </div>
+
+  <button class="filter-btn" onclick="applySearch(1)">Search</button>
+</div>
+
+
+  <div id="restaurantCards" class="restaurant-container"></div>
+  <div id="paginationControls" style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;"></div>
+
+  <script>
+  let limit = 10;
+  let currentPage = 1;
+  let currentMode = 'normal';
+  let currentSearchQuery = '';
+  let debounceTimer;
+
+  // Add this global variable
+  let activeFilters = {};  // ✅ store currently selected filters globally
+  
+  function toggleFilters() {
+    const el = document.getElementById('filterOptions');
+    el.style.display = el.style.display === 'block' ? 'none' : 'block';
+  }
+
+  async function buildFilterOptions() {
+    try {
+      const res = await fetch(`/api/restaurants/filters`); // ✅ FIX: Correct endpoint
+      const result = await res.json();
+      const container = document.getElementById('filterOptions');
+      container.innerHTML = '';
+
+      Object.keys(result).forEach(field => {
+        const details = document.createElement('details');
+        details.className = 'filter-group';
+        const summary = document.createElement('summary');
+        summary.textContent = field;
+        details.appendChild(summary);
+
+        result[field].forEach(value => {
+          const label = document.createElement('label');
+          label.innerHTML = `<input type="checkbox" name="${field}" value="${value}" onchange="applyFiltersAndPaginate(1)"> ${value}`;
+          details.appendChild(label);
+        });
+
+        container.appendChild(details);
+      });
+    } catch (err) {
+      console.error("❌ Failed to fetch filter options:", err);
+    }
+  }
+
+  async function applyFiltersAndPaginate(page) {
+    const checkboxes = document.querySelectorAll('#filterOptions input:checked');
+    activeFilters = {};
+
+    checkboxes.forEach(cb => {
+      const field = cb.name;
+      if (!activeFilters[field]) activeFilters[field] = [];
+      activeFilters[field].push(cb.value);
+    });
+
+    const sortValue = document.getElementById('sortSelect').value;
+
+    try {
+      const query = new URLSearchParams({
+        page,
+        limit,
+        sort: sortValue || '',
+        filters: JSON.stringify(activeFilters)
+      });
+
+      const res = await fetch(`/api/restaurants?${query}`);
+      const result = await res.json();
+
+      currentMode = 'normal';
+      renderRestaurants(result.data);
+      renderPagination(result.total, page, limit);
+      document.getElementById('resultCount').textContent = `Filtered Results: ${result.total}`;
+      currentPage = page;
+    } catch (err) {
+      console.error("❌ Failed to fetch filtered restaurants:", err);
+    }
+  }
+
+  function renderRestaurants(data) {
+    const container = document.getElementById('restaurantCards');
+    container.innerHTML = '';
+    data.forEach(restaurant => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-icon"><i class="fas fa-utensils"></i></div>
+        <div class="card-content">
+          <span><i class="fas fa-store"></i> <strong>${restaurant.name}</strong></span>
+          <span><i class="fas fa-map-marker-alt"></i> ${restaurant.location}</span>
+          <span><i class="fas fa-location-dot"></i> ${restaurant.address}</span>
+          <span><i class="fas fa-bowl-food"></i> ${restaurant.cuisines}</span>
+          <span><i class="fas fa-star"></i> <span class="rate">${restaurant.rate}</span></span>
+          <span><i class="fas fa-thumbs-up"></i> ${restaurant.votes} votes</span>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function renderPagination(total, page, limit) {
+    const totalPages = Math.ceil(total / limit);
+    const pagination = document.getElementById('paginationControls');
+    pagination.innerHTML = '';
+    const blockSize = 5;
+    const currentBlock = Math.floor((page - 1) / blockSize);
+    const startPage = currentBlock * blockSize + 1;
+    let endPage = startPage + blockSize - 1;
+    if (endPage > totalPages) endPage = totalPages;
+    if (startPage > 1) pagination.appendChild(createPageButton('←', startPage - 1));
+    for (let i = startPage; i <= endPage; i++) {
+      pagination.appendChild(createPageButton(i, i, i === page));
+    }
+    if (endPage < totalPages) pagination.appendChild(createPageButton('→', endPage + 1));
+  }
+
+  function createPageButton(text, page, isActive = false) {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.style.padding = '6px 12px';
+    btn.style.margin = '0 3px';
+    btn.style.borderRadius = '5px';
+    btn.style.border = '1px solid #ccc';
+    btn.style.backgroundColor = isActive ? '#d32323' : '#fff';
+    btn.style.color = isActive ? '#fff' : '#333';
+    btn.style.cursor = 'pointer';
+    
+    btn.addEventListener('click', () => {
+      if (currentMode === 'search') {
+        applySearch(page);
+      } else {
+        applyFiltersAndPaginate(page);
+      }
+    });
+
+    return btn;
+  }
+
+  async function fetchInitialRestaurants() {
+    try {
+      const query = new URLSearchParams({
+        page: 1,
+        limit: limit,
+        sort: '',
+        filters: JSON.stringify(activeFilters)  // ✅ now defined
+      });
+
+      const res = await fetch(`/api/restaurants?${query}`);
+      const result = await res.json();
+
+      renderRestaurants(result.data);
+      document.getElementById('resultCount').textContent = `Total Restaurants: ${result.total}`;
+      renderPagination(result.total, 1, limit);
+    } catch (err) {
+      console.error("❌ Failed to fetch initial restaurants:", err);
+    }
+  }
+
+  // async function applySearch(page) {
+  //   currentMode = 'search';
+  //   currentSearchQuery = document.getElementById('searchInput').value.trim();
+
+  //   const params = {
+  //     q: currentSearchQuery,
+  //     page,
+  //     limit
+  //   };
+
+  //   // const sortVal = document.getElementById('sortSelect').value;
+  //   // if (sortVal) params.sort = sortVal;
+
+  //   // if (activeFilters && Object.keys(activeFilters).length > 0) {
+  //   //   params.filters = JSON.stringify(activeFilters);
+  //   // }
+
+  //   const query = new URLSearchParams(params);
+
+  //   try {
+  //     const res = await fetch(`/api/restaurants/trie?${query}`);
+  //     const result = await res.json();
+
+  //     renderRestaurants(result.data);
+  //     renderPagination(result.total, page, limit); // ✅ now using totalPages from backend
+  //     document.getElementById('resultCount').textContent = `Search Results: ${result.total}`;
+  //     currentPage = page;
+  //   } catch (err) {
+  //     console.error("❌ Failed to fetch search results:", err);
+  //   }
+  // }
+
+  async function applySearch(page) {
+    currentMode = 'search';
+    const query = document.getElementById('searchInput').value.trim();
+    currentSearchQuery = query;
+
+    if (!query) {
+      // If empty search, just load normal data
+      await fetchInitialRestaurants();
+      return;
+    }
+
+    const params = new URLSearchParams({
+      q: query,
+      limit,
+    });
+
+    try {
+      const res = await fetch(`/api/restaurants/trie?${params}`);
+      const result = await res.json();
+
+      renderRestaurants(result.data);
+      document.getElementById('resultCount').textContent = `Search Results: ${result.total}`;
+      renderPagination(result.total, page, limit);
+      currentPage = page;
+    } catch (err) {
+      console.error("❌ Failed to fetch Trie search results:", err);
+    }
+  }
+
+   // ====== AUTOCOMPLETE (Swiggy-style) ======
+  function debounceSearch() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => showAutocompleteSuggestions(), 300);
+  }
+
+async function showAutocompleteSuggestions() {
+  const query = document.getElementById('searchInput').value.trim();
+  const dropdown = document.getElementById('autocompleteResults');
+
+  if (!query) {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/restaurants/autocomplete?q=${encodeURIComponent(query)}`);
+    const { data } = await res.json();
+
+    if (!data || data.length === 0) {
+      dropdown.style.display = 'none';
+      dropdown.innerHTML = '';
+      return;
+    }
+
+    console.log(data);
+
+    const cuisines = data.filter(i => i.type === 'cuisine');
+    const restaurants = data.filter(i => i.type === 'restaurant');
+
+    let html = '';
+
+    // 🍛 Cuisines
+    if (cuisines.length > 0) {
+      html += `
+        <div class="autocomplete-section">
+          ${cuisines.map(c => `
+            <div class="autocomplete-item cuisine" onclick="selectAutocomplete('${c.name}', 'cuisine')">
+              <span class="icon">🍛</span>
+              <span class="name">${c.name}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // 🏠 Restaurants Section
+    if (restaurants.length > 0) {
+      html += `
+        <div class="autocomplete-section">
+          ${restaurants.map(r => `
+            <div class="autocomplete-item restaurant" onclick="selectAutocomplete('${r.name}', 'restaurant')">
+              <div class="restaurant-name" style="font-weight:bold; color:black;">${r.name}</div>
+              <div class="restaurant-meta" style="font-size:13px; color:gray;">
+                ⭐ ${r.rate || 'N/A'} • ${r.location || 'Unknown'}
+              </div>
+              ${r.cuisines ? `<div class="restaurant-cuisine" style="font-size:12px; color:#666;">${r.cuisines}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+  } catch (err) {
+    console.error('❌ Autocomplete failed:', err);
+  }
+}
+
+
+  function selectAutocomplete(value) {
+    const input = document.getElementById('searchInput');
+    const dropdown = document.getElementById('autocompleteResults');
+    input.value = value;
+    dropdown.style.display = 'none';
+    applySearch(1);
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#autocompleteResults') && e.target.id !== 'searchInput') {
+      document.getElementById('autocompleteResults').style.display = 'none';
+    }
+  });
+
+
+  async function init() {
+    await buildFilterOptions();
+    await fetchInitialRestaurants();
+  }
+
+  init();
+</script>
+
+</body>
+</html>

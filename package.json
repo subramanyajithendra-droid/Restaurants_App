@@ -1,0 +1,26 @@
+{
+  "name": "pagination-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon ./src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@elastic/elasticsearch": "^9.1.1",
+    "@fastify/static": "^8.2.0",
+    "@fastify/swagger": "^9.5.1",
+    "@fastify/swagger-ui": "^5.2.3",
+    "csv-parser": "^3.2.0",
+    "csvtojson": "^2.0.10",
+    "fastify": "^5.4.0",
+    "fastify-swagger": "^5.1.1",
+    "mongoose": "^8.17.1",
+    "nodemon": "^3.1.10"
+  }
+}
