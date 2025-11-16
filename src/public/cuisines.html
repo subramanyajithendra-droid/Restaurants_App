@@ -68,25 +68,37 @@
     }
 
 
-    .pagination {
+#paginationControls {
   display: flex;
   justify-content: center;
   margin-top: 20px;
   gap: 8px;
 }
 
-.pagination button {
+#paginationControls button {
   border: none;
   padding: 8px 12px;
-  background: #eee;
+  background: #eaeaea;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 6px;
+  font-size: 14px;
 }
 
-.pagination button.active {
-  background: #0078ff;
-  color: white;
+#paginationControls button:hover:not(.active) {
+  background: #d2d2d2;
 }
+
+#paginationControls button.active {
+  background: #d32323;
+  color: white;
+  font-weight: bold;
+}
+
+#paginationControls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 
   </style>
 </head>
@@ -113,7 +125,8 @@
         }
 
         renderRestaurants(data.data, cuisineName);
-        renderPagination(data.totalPages, data.currentPage, cuisineName);
+        renderPagination(data.pagination.totalPages, data.pagination.currentPage, cuisineName);
+
         } catch (err) {
         console.error('❌ Failed to load restaurants:', err);
         container.innerHTML = `<p style="color:red;">Error loading restaurants.</p>`;
@@ -146,42 +159,46 @@
     }
 
     function renderPagination(totalPages, currentPage, cuisineName) {
-        const container = document.getElementById('paginationControls');
-        container.innerHTML = '';
+    const container = document.getElementById("paginationControls");
+    container.innerHTML = "";
 
-        if (totalPages <= 1) return; // hide pagination if only 1 page
+    if (totalPages <= 1) return;
 
-        // 🔹 Previous Button
-        const prev = document.createElement('button');
-        prev.textContent = '« Prev';
-        prev.disabled = currentPage === 1;
-        prev.onclick = () => loadRestaurants(cuisineName, currentPage - 1);
-        container.appendChild(prev);
+    const maxVisible = 5;
 
-        // 🔹 Page Buttons (max 5 visible at once)
-        const maxVisible = 5;
-        let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-        let end = Math.min(totalPages, start + maxVisible - 1);
+    // 🔥 Compute window start/end correctly
+    let half = Math.floor(maxVisible / 2);
+    let start = Math.max(1, currentPage - half);
+    let end = Math.min(totalPages, start + maxVisible - 1);
 
-        if (end - start < maxVisible - 1) {
-           start = Math.max(1, end - maxVisible + 1);
-        }
-
-        for (let i = start; i <= end; i++) {
-            const btn = document.createElement('button');
-            btn.textContent = i;
-            btn.className = i === currentPage ? 'active' : '';
-            btn.onclick = () => loadRestaurants(cuisineName, i);
-            container.appendChild(btn);
-        }
-
-        // 🔹 Next Button
-        const next = document.createElement('button');
-        next.textContent = 'Next »';
-        next.disabled = currentPage === totalPages;
-        next.onclick = () => loadRestaurants(cuisineName, currentPage + 1);
-        container.appendChild(next);
+    // Adjust if end-start < 4
+    if (end - start < maxVisible - 1) {
+        start = Math.max(1, end - maxVisible + 1);
     }
+
+    // ◀️ Previous Button
+    const prevBtn = document.createElement("button");
+    prevBtn.textContent = "‹";
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => loadRestaurants(cuisineName, currentPage - 1);
+    container.appendChild(prevBtn);
+
+    // 🔢 Page number buttons
+    for (let i = start; i <= end; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i;
+        btn.classList.toggle("active", i === currentPage);
+        btn.onclick = () => loadRestaurants(cuisineName, i);
+        container.appendChild(btn);
+    }
+
+    // ▶️ Next Button
+    const nextBtn = document.createElement("button");
+    nextBtn.textContent = "›";
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => loadRestaurants(cuisineName, currentPage + 1);
+    container.appendChild(nextBtn);
+}
 
     document.addEventListener('DOMContentLoaded', async() => {
         const params = new URLSearchParams(window.location.search);

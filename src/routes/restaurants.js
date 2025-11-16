@@ -125,16 +125,37 @@ async function restaurantRoutes(fastify, options) {
 
     try {
       const regex = new RegExp(name.trim(), 'i');
-      
-      // Count first for pagination
-      const totalRecords = await Restaurant.countDocuments({ cuisines: regex });
 
-      // Paginated query
-      const restaurants = await Restaurant.find({ cuisines: regex })
-        .skip(skip)
-        .limit(limit)
-        .sort({ name: 1 }) // optional alphabetical sort
-        .lean();
+      // 🎯 Aggregate + Group to remove duplicates by name
+      const pipeline = [
+        { $match: {cuisines: regex}},
+
+        // Group by restaurant name
+        {
+          $group: {
+            _id: '$name',
+            doc: { $first: "$$ROOT"}
+          }
+        },
+
+        // Replace doc
+        { $replaceRoot: {newRoot: '$doc'}},
+
+        // Pagination
+        { $skip: skip },
+        { $limit: limit }
+      ];
+
+      const restaurants = await Restaurant.aggregate(pipeline);
+
+       // Count unique
+      const countPipeline = [
+        { $match: { cuisines: regex } },
+        { $group: { _id: "$name" } }
+      ];
+
+      // Count first for pagination
+      const totalRecords = (await Restaurant.aggregate(countPipeline)).length;
 
       const totalPages = Math.ceil(totalRecords / limit);
 
