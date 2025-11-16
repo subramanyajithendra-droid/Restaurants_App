@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cuisine Restaurants</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #fafafa;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+
+    h2 {
+      color: #d32323;
+      margin-bottom: 20px;
+    }
+
+    .restaurant-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 15px;
+    }
+
+    .card {
+      display: flex;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      overflow: hidden;
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+    }
+
+    .card-icon {
+      background: #d32323;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 60px;
+      font-size: 24px;
+    }
+
+    .card-content {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .card-content span {
+      font-size: 14px;
+      color: #555;
+    }
+
+    .card-content strong {
+      color: #333;
+    }
+
+    .rate {
+      font-weight: bold;
+      color: #ff9800;
+    }
+
+
+    .pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  gap: 8px;
+}
+
+.pagination button {
+  border: none;
+  padding: 8px 12px;
+  background: #eee;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.pagination button.active {
+  background: #0078ff;
+  color: white;
+}
+
+  </style>
+</head>
+<body>
+  <div id="resultsContainer"></div>
+
+  <div id="paginationControls"></div>
+
+  <script>
+    async function loadRestaurants(cuisineName, page = 1, limit = 10) {
+        const container = document.getElementById('resultsContainer');
+        const pagination = document.getElementById('paginationControls');
+        container.innerHTML = `<h2>Restaurants serving "${cuisineName}"</h2><p>Loading...</p>`;
+        pagination.innerHTML = '';
+
+        try {
+        const res = await fetch(`/api/restaurants/by-cuisine?name=${encodeURIComponent(cuisineName)}&page=${page}&limit=${limit}`);
+        const data = await res.json();
+        console.log(data);
+
+        if (!data.success || !data.data || data.data.length === 0) {
+            container.innerHTML = `<h2>Restaurants serving "${cuisineName}"</h2><p>No restaurants found.</p>`;
+            return;
+        }
+
+        renderRestaurants(data.data, cuisineName);
+        renderPagination(data.totalPages, data.currentPage, cuisineName);
+        } catch (err) {
+        console.error('❌ Failed to load restaurants:', err);
+        container.innerHTML = `<p style="color:red;">Error loading restaurants.</p>`;
+        }
+    }
+
+    function renderRestaurants(restaurants, cuisineName) {
+        const container = document.getElementById('resultsContainer');
+        container.innerHTML = `<h2>Restaurants serving "${cuisineName}"</h2>`;
+
+        const html = `
+        <div class="restaurant-container">
+            ${restaurants.map(r => `
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-utensils"></i></div>
+                <div class="card-content">
+                <span><i class="fas fa-store"></i> <strong>${r.name}</strong></span>
+                <span><i class="fas fa-map-marker-alt"></i> ${r.location || 'N/A'}</span>
+                <span><i class="fas fa-location-dot"></i> ${r.address || ''}</span>
+                <span><i class="fas fa-bowl-food"></i> ${r.cuisines || ''}</span>
+                <span><i class="fas fa-star"></i> <span class="rate">${r.rate || 'N/A'}</span></span>
+                <span><i class="fas fa-thumbs-up"></i> ${r.votes || 0} votes</span>
+                </div>
+            </div>
+            `).join('')}
+        </div>
+        `;
+
+        container.innerHTML += html;
+    }
+
+    function renderPagination(totalPages, currentPage, cuisineName) {
+        const container = document.getElementById('paginationControls');
+        container.innerHTML = '';
+
+        if (totalPages <= 1) return; // hide pagination if only 1 page
+
+        // 🔹 Previous Button
+        const prev = document.createElement('button');
+        prev.textContent = '« Prev';
+        prev.disabled = currentPage === 1;
+        prev.onclick = () => loadRestaurants(cuisineName, currentPage - 1);
+        container.appendChild(prev);
+
+        // 🔹 Page Buttons (max 5 visible at once)
+        const maxVisible = 5;
+        let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        let end = Math.min(totalPages, start + maxVisible - 1);
+
+        if (end - start < maxVisible - 1) {
+           start = Math.max(1, end - maxVisible + 1);
+        }
+
+        for (let i = start; i <= end; i++) {
+            const btn = document.createElement('button');
+            btn.textContent = i;
+            btn.className = i === currentPage ? 'active' : '';
+            btn.onclick = () => loadRestaurants(cuisineName, i);
+            container.appendChild(btn);
+        }
+
+        // 🔹 Next Button
+        const next = document.createElement('button');
+        next.textContent = 'Next »';
+        next.disabled = currentPage === totalPages;
+        next.onclick = () => loadRestaurants(cuisineName, currentPage + 1);
+        container.appendChild(next);
+    }
+
+    document.addEventListener('DOMContentLoaded', async() => {
+        const params = new URLSearchParams(window.location.search);
+        const cuisineName = params.get('name');
+        const container = document.getElementById('resultsContainer');
+
+        if (!cuisineName) {
+            container.innerHTML = '<p>No cuisine selected.</p>';
+            return;
+        }
+
+        await loadRestaurants(cuisineName, 1);
+    })
+
+
+  </script>
+</body>
+</html>

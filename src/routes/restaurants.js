@@ -7,66 +7,162 @@ const { RestaurantTrie } = require('../services/TrieLoader')
 async function restaurantRoutes(fastify, options) {
 
   fastify.get('/restaurants/autocomplete', {
+    schema: {
+      tags: ['Restaurants'],
+      summary: 'Autocomplete suggestions for restaurants and cuisines',
+      querystring: {
+        type: 'object',
+        properties: {
+          q: { type: 'string' },
+          limit: { type: 'integer', default: 10 }
+        }
+      }
+    },
+
+    handler: async (req, reply) => {
+      const { q = '', limit = 10 } = req.query;
+      if (!q) return reply.send({ total: 0, data: [] });
+
+      const results = RestaurantTrie.search(q.toLowerCase());
+      const cuisinesSet = new Set();
+      const restaurantMap = new Map();
+
+      results.forEach(r => {
+        if (!r || !r.name) return;
+
+        // cuisines
+        if (r.type === 'cuisine' && r.name.toLowerCase().includes(q.toLowerCase())) {
+          cuisinesSet.add(r.name.trim());
+        }
+
+        // restaurants
+        if (r.type === 'restaurant') {
+          if (
+            r.name.toLowerCase().includes(q.toLowerCase()) ||
+            (r.cuisines && r.cuisines.toLowerCase().includes(q.toLowerCase()))
+          ) {
+            restaurantMap.set(r._id, {
+              _id: r._id,
+              name: r.name,
+              cuisines: r.cuisines || '',
+              rate: r.rate || 0,
+              location: r.location || '',
+              type: 'restaurant'
+            });
+          }
+
+          // also pick cuisines matching query
+          if (r.cuisines) {
+            r.cuisines.split(',').map(c => c.trim()).forEach(cuisine => {
+              if (cuisine.toLowerCase().includes(q.toLowerCase())) {
+                cuisinesSet.add(cuisine);
+              }
+            });
+          }
+        }
+      });
+
+      const cuisines = Array.from(cuisinesSet).map(c => ({ name: c, type: 'cuisine' }));
+      const restaurants = Array.from(restaurantMap.values());
+      const merged = [...cuisines, ...restaurants].slice(0, limit);
+
+      reply.send({ total: merged.length, data: merged });
+    }
+  });
+
+
+  fastify.get('/restaurants/by-cuisine', {
   schema: {
     tags: ['Restaurants'],
-    summary: 'Autocomplete suggestions for restaurants and cuisines',
+    summary: 'Get restaurants by cuisine',
+    description: 'Fetch restaurants filtered by cuisine name with pagination support',
     querystring: {
       type: 'object',
       properties: {
-        q: { type: 'string' },
-        limit: { type: 'integer', default: 10 }
+        name: { type: 'string', minLength: 1, description: 'Cuisine name (e.g., Chinese)' },
+        page: { type: 'integer', minimum: 1, default: 1, description: 'Page number' },
+        limit: { type: 'integer', minimum: 1, maximum: 50, default: 10, description: 'Results per page' }
+      },
+      required: ['name']
+    },
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean' },
+          pagination: {
+            type: 'object',
+            properties: {
+              totalRecords: { type: 'integer' },
+              totalPages: { type: 'integer' },
+              currentPage: { type: 'integer' },
+              limit: { type: 'integer' }
+            }
+          },
+          data: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                _id: { type: 'string' },
+                name: { type: 'string' },
+                location: { type: 'string' },
+                address: { type: 'string' },
+                cuisines: { type: 'string' },
+                rate: { type: 'string' },
+                votes: { type: 'integer' }
+              }
+            }
+          }
+        }
       }
     }
   },
 
   handler: async (req, reply) => {
-    const { q = '', limit = 10 } = req.query;
-    if (!q) return reply.send({ total: 0, data: [] });
+    const { name, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
 
-    const results = RestaurantTrie.search(q.toLowerCase());
-    const cuisinesSet = new Set();
-    const restaurantMap = new Map();
+    try {
+      const regex = new RegExp(name.trim(), 'i');
+      
+      // Count first for pagination
+      const totalRecords = await Restaurant.countDocuments({ cuisines: regex });
 
-    results.forEach(r => {
-      if (!r || !r.name) return;
+      // Paginated query
+      const restaurants = await Restaurant.find({ cuisines: regex })
+        .skip(skip)
+        .limit(limit)
+        .sort({ name: 1 }) // optional alphabetical sort
+        .lean();
 
-      // cuisines
-      if (r.type === 'cuisine' && r.name.toLowerCase().includes(q.toLowerCase())) {
-        cuisinesSet.add(r.name.trim());
-      }
+      const totalPages = Math.ceil(totalRecords / limit);
 
-      // restaurants
-      if (r.type === 'restaurant') {
-        if (
-          r.name.toLowerCase().includes(q.toLowerCase()) ||
-          (r.cuisines && r.cuisines.toLowerCase().includes(q.toLowerCase()))
-        ) {
-          restaurantMap.set(r._id, {
-            _id: r._id,
-            name: r.name,
-            cuisines: r.cuisines || '',
-            rate: r.rate || 0,
-            location: r.location || '',
-            type: 'restaurant'
-          });
-        }
-
-        // also pick cuisines matching query
-        if (r.cuisines) {
-          r.cuisines.split(',').map(c => c.trim()).forEach(cuisine => {
-            if (cuisine.toLowerCase().includes(q.toLowerCase())) {
-              cuisinesSet.add(cuisine);
-            }
-          });
-        }
-      }
-    });
-
-    const cuisines = Array.from(cuisinesSet).map(c => ({ name: c, type: 'cuisine' }));
-    const restaurants = Array.from(restaurantMap.values());
-    const merged = [...cuisines, ...restaurants].slice(0, limit);
-
-    reply.send({ total: merged.length, data: merged });
+      return reply.send({
+        success: true,
+        pagination: {
+          totalRecords,
+          totalPages,
+          currentPage: page,
+          limit
+        },
+        data: restaurants.map(r => ({
+          _id: r._id,
+          name: r.name,
+          location: r.location || '',
+          address: r.address || '',
+          cuisines: r.cuisines || '',
+          rate: r.rate || r.rateNum || 'N/A',
+          votes: r.votes || r.votesNum || 0
+        }))
+      });
+    } catch (err) {
+      req.log.error({ err }, 'Error fetching restaurants by cuisine');
+      return reply.status(500).send({
+        success: false,
+        error: 'Internal Server Error'
+      });
+    }
   }
 });
 

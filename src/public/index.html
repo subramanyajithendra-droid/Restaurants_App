@@ -505,13 +505,16 @@ async function showAutocompleteSuggestions() {
 }
 
 
-  function selectAutocomplete(value) {
-    const input = document.getElementById('searchInput');
-    const dropdown = document.getElementById('autocompleteResults');
-    input.value = value;
-    dropdown.style.display = 'none';
-    applySearch(1);
+  function selectAutocomplete(value, type) {
+    if (type === 'cuisine') {
+      // Redirect to cuisine results page
+      window.location.href = `/cuisines.html?name=${encodeURIComponent(value)}`;
+    } else if (type === 'restaurant') {
+      // Optionally, navigate to restaurant details page (if you have one)
+      window.location.href = `/restaurants.html?name=${encodeURIComponent(value)}`;
+    }
   }
+
 
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#autocompleteResults') && e.target.id !== 'searchInput') {
